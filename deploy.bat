@@ -17,26 +17,32 @@ set DB_USER=contractor
 set DB_PASS=contractor_pass
 set DB_NAME=contractor_pro
 set DB_URL=postgresql://%DB_USER%:%DB_PASS%@contractor-db:5432/%DB_NAME%
+set REDIS_URL=redis://contractor-redis:6379/0
 :: ────────────────────────────────────────────────────────────────────────────
 
-echo [1/4] Building Docker image...
+echo [1/5] Building Docker image...
 docker build -t %IMAGE% .
 if %errorlevel% neq 0 ( echo BUILD FAILED & pause & exit /b 1 )
 
 echo.
-echo [2/4] Pushing to VPS registry...
+echo [2/5] Pushing to VPS registry...
 docker push %IMAGE%
 if %errorlevel% neq 0 ( echo PUSH FAILED & pause & exit /b 1 )
 
 echo.
-echo [3/4] Ensuring database is running on VPS...
-ssh root@%VPS% "docker network create contractor-net 2>/dev/null; docker run -d --name contractor-db --network contractor-net --restart unless-stopped -e POSTGRES_USER=%DB_USER% -e POSTGRES_PASSWORD=%DB_PASS% -e POSTGRES_DB=%DB_NAME% -v contractor_pgdata:/var/lib/postgresql/data postgres:16-alpine 2>/dev/null; echo Database ready"
-if %errorlevel% neq 0 ( echo DB SETUP FAILED & pause & exit /b 1 )
+echo [3/5] Ensuring network, database, and Redis are running on VPS...
+ssh root@%VPS% "docker network create contractor-net 2>/dev/null; docker run -d --name contractor-db --network contractor-net --restart unless-stopped -e POSTGRES_USER=%DB_USER% -e POSTGRES_PASSWORD=%DB_PASS% -e POSTGRES_DB=%DB_NAME% -v contractor_pgdata:/var/lib/postgresql/data postgres:16-alpine 2>/dev/null; docker run -d --name contractor-redis --network contractor-net --restart unless-stopped redis:7-alpine 2>/dev/null; echo Infrastructure ready"
+if %errorlevel% neq 0 ( echo INFRA SETUP FAILED & pause & exit /b 1 )
 
 echo.
-echo [4/4] Deploying app container on VPS...
-ssh root@%VPS% "docker pull %IMAGE%:latest && docker stop contractor-pro 2>/dev/null; docker rm contractor-pro 2>/dev/null; docker run -d --name contractor-pro --network contractor-net --restart unless-stopped -p 3000:3000 -v contractor_uploads:/app/uploads -e NODE_ENV=production -e DATABASE_URL=%DB_URL% -e JWT_SECRET=%JWT_SECRET% %IMAGE%:latest"
+echo [4/5] Deploying app container on VPS...
+ssh root@%VPS% "docker pull %IMAGE%:latest && docker stop contractor-pro 2>/dev/null; docker rm contractor-pro 2>/dev/null; docker run -d --name contractor-pro --network contractor-net --restart unless-stopped -p 3000:3000 -v contractor_uploads:/app/uploads -e NODE_ENV=production -e DATABASE_URL=%DB_URL% -e JWT_SECRET=%JWT_SECRET% -e CELERY_BROKER_URL=%REDIS_URL% %IMAGE%:latest"
 if %errorlevel% neq 0 ( echo VPS UPDATE FAILED & pause & exit /b 1 )
+
+echo.
+echo [5/5] Deploying Celery worker on VPS...
+ssh root@%VPS% "docker stop contractor-celery 2>/dev/null; docker rm contractor-celery 2>/dev/null; docker run -d --name contractor-celery --network contractor-net --restart unless-stopped -v contractor_uploads:/app/uploads -e NODE_ENV=production -e DATABASE_URL=%DB_URL% -e JWT_SECRET=%JWT_SECRET% -e CELERY_BROKER_URL=%REDIS_URL% %IMAGE%:latest celery -A api.worker worker --loglevel=info --concurrency=2"
+if %errorlevel% neq 0 ( echo CELERY DEPLOY FAILED & pause & exit /b 1 )
 
 echo.
 echo  Done! Site is live at https://xtghost.net

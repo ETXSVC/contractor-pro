@@ -1,40 +1,32 @@
-# Stage 1: Production deps only (clean Alpine, no devDeps, no cache conflict)
-FROM node:20-alpine AS deps
+# ── Stage 1: Build React frontend ─────────────────────────────────────────────
+FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --omit=dev
-
-# Stage 2: Full build (devDeps available for tsx, esbuild, prisma CLI)
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-COPY prisma ./prisma/
 RUN npm ci
-RUN npx prisma generate
 COPY . .
 RUN npm run build
 
-# Stage 3: Lean production image — no npm install at all
-FROM node:20-alpine AS runner
+# ── Stage 2: Python runtime ───────────────────────────────────────────────────
+FROM python:3.12-slim AS runner
 WORKDIR /app
-ENV NODE_ENV=production
-RUN apk add --no-cache openssl
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
 
-# Clean production node_modules from stage 1
-COPY --from=deps /app/node_modules ./node_modules
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Override with Prisma-generated client + CLI from stage 2
-COPY --from=builder /app/node_modules/.prisma          ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma/client   ./node_modules/@prisma/client
-COPY --from=builder /app/node_modules/prisma           ./node_modules/prisma
-COPY --from=builder /app/node_modules/.bin/prisma      ./node_modules/.bin/prisma
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Built frontend + compiled server
-COPY --from=builder /app/dist ./dist
+COPY api/ ./api/
+COPY alembic/ ./alembic/
+COPY alembic.ini .
 
-# Schema needed for migrate deploy
-COPY --from=builder /app/prisma ./prisma
-COPY package*.json ./
+COPY --from=frontend-builder /app/dist ./dist
+
+RUN mkdir -p uploads
 
 EXPOSE 3000
-CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/server.cjs"]
+
+CMD ["gunicorn", "api.main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:3000", "--timeout", "120"]
