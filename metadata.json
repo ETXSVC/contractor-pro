@@ -1,0 +1,6 @@
+{
+  "name": "Contractor Pro",
+  "description": "High-fidelity contractor construction management system with interactive dispatch dashboards, cost code logs, change order approvals, bid pipeline manager, staff locator, digital drawing center, and automated Gemini AI Estimator.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
