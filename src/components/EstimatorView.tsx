@@ -147,7 +147,7 @@ export const EstimatorView: React.FC<EstimatorProps> = ({
               <h2 className="text-lg font-bold font-display text-white">Neural Construction Cost Estimator</h2>
             </div>
             <p className="text-xs text-slate-405">
-              Submit dimensions & specifications. Gemini AI parses trades, raw regional supplies, permit codes, and computes budgets.
+              Submit dimensions & specifications. The estimation engine parses trades, raw regional supplies, permit codes, and computes budgets.
             </p>
 
             <form onSubmit={handleRunAiEstimator} className="grid grid-cols-2 gap-4 text-xs">
@@ -235,7 +235,7 @@ export const EstimatorView: React.FC<EstimatorProps> = ({
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4 text-slate-950" />
-                      Run Gemini AI Estimation Engine
+                      Run AI Estimation Engine
                     </>
                   )}
                 </button>
@@ -249,7 +249,7 @@ export const EstimatorView: React.FC<EstimatorProps> = ({
               <div className="flex justify-between items-center pb-2 border-b border-slate-850">
                 <div className="flex items-center gap-2">
                   <FileCheck2 className="w-5 h-5 text-cyan-400" />
-                  <h3 className="font-bold text-white text-sm">Gemini AI Estimation Report Approved</h3>
+                  <h3 className="font-bold text-white text-sm">AI Estimation Report Approved</h3>
                 </div>
                 <span className="text-[10px] bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded font-mono font-bold uppercase">
                   Prediction S-Class
