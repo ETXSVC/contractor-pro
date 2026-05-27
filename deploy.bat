@@ -35,7 +35,7 @@ if %errorlevel% neq 0 ( echo DB SETUP FAILED & pause & exit /b 1 )
 
 echo.
 echo [4/4] Deploying app container on VPS...
-ssh root@%VPS% "docker pull %IMAGE%:latest && docker stop contractor-pro 2>/dev/null; docker rm contractor-pro 2>/dev/null; docker run -d --name contractor-pro --network contractor-net --restart unless-stopped -p 3000:3000 -e NODE_ENV=production -e DATABASE_URL=%DB_URL% -e JWT_SECRET=%JWT_SECRET% %IMAGE%:latest"
+ssh root@%VPS% "docker pull %IMAGE%:latest && docker stop contractor-pro 2>/dev/null; docker rm contractor-pro 2>/dev/null; docker run -d --name contractor-pro --network contractor-net --restart unless-stopped -p 3000:3000 -v contractor_uploads:/app/uploads -e NODE_ENV=production -e DATABASE_URL=%DB_URL% -e JWT_SECRET=%JWT_SECRET% %IMAGE%:latest"
 if %errorlevel% neq 0 ( echo VPS UPDATE FAILED & pause & exit /b 1 )
 
 echo.
