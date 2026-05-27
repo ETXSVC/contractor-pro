@@ -1,6 +1,7 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
+import { AuthProvider } from './contexts/AuthContext.tsx';
 import './index.css';
 
 // Intercept and swallow benign Vite HMR/WebSocket connection errors expected in sandboxed preview environments
@@ -35,7 +36,9 @@ window.addEventListener('error', (event) => {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <AuthProvider>
+      <App />
+    </AuthProvider>
   </StrictMode>,
 );
 

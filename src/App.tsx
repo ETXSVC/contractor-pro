@@ -1,26 +1,30 @@
 import { useState, useEffect } from "react";
-import { 
-  Project, 
-  Task, 
-  Document, 
-  TeamMember, 
-  Proposal, 
-  Invoice, 
-  TimeRecord, 
-  BudgetCostCode, 
-  ChangeOrder 
+import {
+  Project,
+  Task,
+  Document,
+  TeamMember,
+  Proposal,
+  Invoice,
+  TimeRecord,
+  BudgetCostCode,
+  ChangeOrder
 } from "./types";
-import { 
-  initialProjects, 
-  initialTasks, 
-  initialDocuments, 
-  initialTeamMembers, 
-  initialProposals, 
-  initialInvoices, 
-  initialTimeRecords, 
-  initialBudgetCostCodes, 
-  initialChangeOrders 
+import {
+  initialProjects,
+  initialTasks,
+  initialDocuments,
+  initialTeamMembers,
+  initialProposals,
+  initialInvoices,
+  initialTimeRecords,
+  initialBudgetCostCodes,
+  initialChangeOrders
 } from "./data";
+
+import { useAuth } from "./contexts/AuthContext";
+import { api } from "./lib/api";
+import { LoginView } from "./components/LoginView";
 
 // Sub-views
 import { DashboardView } from "./components/DashboardView";
@@ -69,132 +73,150 @@ type ActiveTab =
   | "budgets";
 
 export default function App() {
+  const { user, logout } = useAuth();
+
+  // Show login screen if not authenticated
+  if (!user) return <LoginView />;
+
+  return <AppShell user={user} logout={logout} />;
+}
+
+function AppShell({ user, logout }: { user: { id: string; email: string; tenantId: string }; logout: () => void }) {
   const [activeTab, setActiveTab2] = useState<ActiveTab>("dashboard");
   const [activeFinancialLink, setActiveFinancialLink] = useState<string>("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedProjectDetail, setSelectedProjectDetail] = useState<Project | null>(null);
 
-  // Core Persistent State
+  // Core state — starts from localStorage cache, refreshed from API
   const [projects, setProjects] = useState<Project[]>(() => {
     const saved = localStorage.getItem("cp_projects");
     return saved ? JSON.parse(saved) : initialProjects;
   });
-
   const [tasks, setTasks] = useState<Task[]>(() => {
     const saved = localStorage.getItem("cp_tasks");
     return saved ? JSON.parse(saved) : initialTasks;
   });
-
   const [documents, setDocuments] = useState<Document[]>(() => {
     const saved = localStorage.getItem("cp_documents");
     return saved ? JSON.parse(saved) : initialDocuments;
   });
-
   const [team, setTeam] = useState<TeamMember[]>(() => {
     const saved = localStorage.getItem("cp_team");
     return saved ? JSON.parse(saved) : initialTeamMembers;
   });
-
   const [proposals, setProposals] = useState<Proposal[]>(() => {
     const saved = localStorage.getItem("cp_proposals");
     return saved ? JSON.parse(saved) : initialProposals;
   });
-
   const [invoices, setInvoices] = useState<Invoice[]>(() => {
     const saved = localStorage.getItem("cp_invoices");
     return saved ? JSON.parse(saved) : initialInvoices;
   });
-
   const [timeRecords, setTimeRecords] = useState<TimeRecord[]>(() => {
     const saved = localStorage.getItem("cp_timeRecords");
     return saved ? JSON.parse(saved) : initialTimeRecords;
   });
-
   const [costCodes, setCostCodes] = useState<BudgetCostCode[]>(() => {
     const saved = localStorage.getItem("cp_costCodes");
     return saved ? JSON.parse(saved) : initialBudgetCostCodes;
   });
-
   const [changeOrders, setChangeOrders] = useState<ChangeOrder[]>(() => {
     const saved = localStorage.getItem("cp_changeOrders");
     return saved ? JSON.parse(saved) : initialChangeOrders;
   });
 
-  // Sync to LocalStorage on updates
+  // Load fresh data from API on mount
   useEffect(() => {
-    localStorage.setItem("cp_projects", JSON.stringify(projects));
-  }, [projects]);
+    Promise.all([
+      api.projects.list(),
+      api.tasks.list(),
+      api.documents.list(),
+      api.team.list(),
+      api.proposals.list(),
+      api.invoices.list(),
+      api.changeOrders.list(),
+      api.budgets.list(),
+      api.timeRecords.list(),
+    ]).then(([apiProjects, apiTasks, apiDocuments, apiTeam, apiProposals, apiInvoices, apiChangeOrders, apiBudgets, apiTimeRecords]) => {
+      if (apiProjects.length)     setProjects(apiProjects);
+      if (apiTasks.length)        setTasks(apiTasks);
+      if (apiDocuments.length)    setDocuments(apiDocuments);
+      if (apiTeam.length)         setTeam(apiTeam);
+      if (apiProposals.length)    setProposals(apiProposals);
+      if (apiInvoices.length)     setInvoices(apiInvoices);
+      if (apiChangeOrders.length) setChangeOrders(apiChangeOrders);
+      if (apiBudgets.length)      setCostCodes(apiBudgets);
+      if (apiTimeRecords.length)  setTimeRecords(apiTimeRecords);
+    }).catch(() => {
+      // Backend not reachable — keep local state as-is
+    });
+  }, [user.id]);
 
-  useEffect(() => {
-    localStorage.setItem("cp_tasks", JSON.stringify(tasks));
-  }, [tasks]);
+  // Mirror to localStorage as a cache
+  useEffect(() => { localStorage.setItem("cp_projects", JSON.stringify(projects)); }, [projects]);
+  useEffect(() => { localStorage.setItem("cp_tasks", JSON.stringify(tasks)); }, [tasks]);
+  useEffect(() => { localStorage.setItem("cp_documents", JSON.stringify(documents)); }, [documents]);
+  useEffect(() => { localStorage.setItem("cp_team", JSON.stringify(team)); }, [team]);
+  useEffect(() => { localStorage.setItem("cp_proposals", JSON.stringify(proposals)); }, [proposals]);
+  useEffect(() => { localStorage.setItem("cp_invoices", JSON.stringify(invoices)); }, [invoices]);
+  useEffect(() => { localStorage.setItem("cp_timeRecords", JSON.stringify(timeRecords)); }, [timeRecords]);
+  useEffect(() => { localStorage.setItem("cp_costCodes", JSON.stringify(costCodes)); }, [costCodes]);
+  useEffect(() => { localStorage.setItem("cp_changeOrders", JSON.stringify(changeOrders)); }, [changeOrders]);
 
-  useEffect(() => {
-    localStorage.setItem("cp_documents", JSON.stringify(documents));
-  }, [documents]);
+  // --- Mutation handlers ---
 
-  useEffect(() => {
-    localStorage.setItem("cp_team", JSON.stringify(team));
-  }, [team]);
-
-  useEffect(() => {
-    localStorage.setItem("cp_proposals", JSON.stringify(proposals));
-  }, [proposals]);
-
-  useEffect(() => {
-    localStorage.setItem("cp_invoices", JSON.stringify(invoices));
-  }, [invoices]);
-
-  useEffect(() => {
-    localStorage.setItem("cp_timeRecords", JSON.stringify(timeRecords));
-  }, [timeRecords]);
-
-  useEffect(() => {
-    localStorage.setItem("cp_costCodes", JSON.stringify(costCodes));
-  }, [costCodes]);
-
-  useEffect(() => {
-    localStorage.setItem("cp_changeOrders", JSON.stringify(changeOrders));
-  }, [changeOrders]);
-
-  // Global triggers
-  const handleAddProject = (p: Project) => {
-    setProjects([p, ...projects]);
+  const handleAddProject = async (p: Project) => {
+    setProjects(prev => [p, ...prev]);
+    try {
+      const created = await api.projects.create(p);
+      setProjects(prev => prev.map(x => x.id === p.id ? { ...x, id: created.id } : x));
+    } catch {/* keep optimistic */}
   };
 
-  const handleSelectProject = (p: Project) => {
-    setSelectedProjectDetail(p);
-  };
+  const handleSelectProject = (p: Project) => setSelectedProjectDetail(p);
 
-  const handleAddTask = (t: Task) => {
-    setTasks([t, ...tasks]);
-    // increment project tasks count
+  const handleAddTask = async (t: Task) => {
+    setTasks(prev => [t, ...prev]);
     setProjects(prev => prev.map(p => p.id === t.projectId ? { ...p, tasksCount: p.tasksCount + 1 } : p));
+    try {
+      const created = await api.tasks.create(t);
+      setTasks(prev => prev.map(x => x.id === t.id ? { ...x, id: created.id } : x));
+    } catch {/* keep optimistic */}
   };
 
-  const handleUpdateTaskStatus = (taskId: string, newStatus: Task["status"]) => {
+  const handleUpdateTaskStatus = async (taskId: string, newStatus: Task["status"]) => {
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+    try { await api.tasks.update(taskId, { status: newStatus }); } catch {/* keep optimistic */}
   };
 
-  const handleDeleteTask = (taskId: string) => {
+  const handleDeleteTask = async (taskId: string) => {
     setTasks(prev => prev.filter(t => t.id !== taskId));
+    try { await api.tasks.delete(taskId); } catch {/* keep optimistic */}
   };
 
-  const handleAddDocument = (d: Document) => {
-    setDocuments([d, ...documents]);
+  const handleAddDocument = async (d: Document) => {
+    setDocuments(prev => [d, ...prev]);
+    try {
+      const created = await api.documents.create(d);
+      setDocuments(prev => prev.map(x => x.id === d.id ? { ...x, id: created.id } : x));
+    } catch {/* keep optimistic */}
   };
 
-  const handleDeleteDocument = (docId: string) => {
+  const handleDeleteDocument = async (docId: string) => {
     setDocuments(prev => prev.filter(d => d.id !== docId));
+    try { await api.documents.delete(docId); } catch {/* keep optimistic */}
   };
 
-  const handleAddMember = (m: TeamMember) => {
-    setTeam([...team, m]);
+  const handleAddMember = async (m: TeamMember) => {
+    setTeam(prev => [...prev, m]);
+    try {
+      const created = await api.team.create(m);
+      setTeam(prev => prev.map(x => x.id === m.id ? { ...x, id: created.id } : x));
+    } catch {/* keep optimistic */}
   };
 
-  const handleAddProposal = (prop: Proposal) => {
-    setProposals([prop, ...proposals]);
-    // If proposal is instantly approved, let's bootstrap a new In-Progress project!
+  const handleAddProposal = async (prop: Proposal) => {
+    setProposals(prev => [prop, ...prev]);
     if (prop.status === "Approved") {
       const createdProj: Project = {
         id: "proj_ai_" + Date.now(),
@@ -212,60 +234,61 @@ export default function App() {
         tasksCount: 0
       };
       setProjects(prev => [createdProj, ...prev]);
+      try { await api.projects.create(createdProj); } catch {/* keep optimistic */}
     }
+    try {
+      const created = await api.proposals.create(prop);
+      setProposals(prev => prev.map(x => x.id === prop.id ? { ...x, id: created.id } : x));
+    } catch {/* keep optimistic */}
   };
 
-  const handleAddInvoice = (inv: Invoice) => {
-    setInvoices([inv, ...invoices]);
+  const handleAddInvoice = async (inv: Invoice) => {
+    setInvoices(prev => [inv, ...prev]);
+    try {
+      const created = await api.invoices.create(inv);
+      setInvoices(prev => prev.map(x => x.id === inv.id ? { ...x, id: created.id } : x));
+    } catch {/* keep optimistic */}
   };
 
-  const handleAddRecord = (rec: TimeRecord) => {
-    setTimeRecords([rec, ...timeRecords]);
+  const handleAddRecord = async (rec: TimeRecord) => {
+    setTimeRecords(prev => [rec, ...prev]);
+    try {
+      const created = await api.timeRecords.create(rec);
+      setTimeRecords(prev => prev.map(x => x.id === rec.id ? { ...x, id: created.id } : x));
+    } catch {/* keep optimistic */}
   };
 
-  const handleDeleteRecord = (id: string) => {
+  const handleDeleteRecord = async (id: string) => {
     setTimeRecords(prev => prev.filter(r => r.id !== id));
+    try { await api.timeRecords.delete(id); } catch {/* keep optimistic */}
   };
 
-  const handleApproveChangeOrder = (id: string) => {
+  const handleApproveChangeOrder = async (id: string) => {
     const co = changeOrders.find(c => c.id === id);
     if (!co) return;
 
-    // Approve the change order
-    setChangeOrders(prev => prev.map(c => c.id === id ? { ...c, status: "Approved" } : c));
-
-    // Dynamic Financial Sync: Increment the associated project's spent amount!
+    setChangeOrders(prev => prev.map(c => c.id === id ? { ...c, status: "Approved" as const } : c));
     setProjects(prev => prev.map(p => {
-      // Fuzzy matching name
       if (p.id === co.projectId || p.name.includes(co.projectName)) {
         return { ...p, spent: p.spent + co.amount, progress: Math.min(95, p.progress + 5) };
       }
       return p;
     }));
-
-    // Dynamic Cost Code Sync: Add to actual spent of a target code (e.g., structural steel or general contractor codes)
     setCostCodes(prev => prev.map(cc => {
-      // Add spending to Finish Carpentry or General MEP code depending on matching
-      if (co.title.toLowerCase().includes("electrical") && cc.code === "26-000") {
-        return { ...cc, actual: cc.actual + co.amount };
-      }
-      if (co.title.toLowerCase().includes("quartz") && cc.code === "09-300") {
-        return { ...cc, actual: cc.actual + co.amount };
-      }
-      if (co.title.toLowerCase().includes("foundation") && cc.code === "03-200") {
-        return { ...cc, actual: cc.actual + co.amount };
-      }
+      if (co.title.toLowerCase().includes("electrical") && cc.code === "26-000") return { ...cc, actual: cc.actual + co.amount };
+      if (co.title.toLowerCase().includes("quartz") && cc.code === "09-300") return { ...cc, actual: cc.actual + co.amount };
+      if (co.title.toLowerCase().includes("foundation") && cc.code === "03-200") return { ...cc, actual: cc.actual + co.amount };
       return cc;
     }));
-
-    alert(`Change order "${co.title}" approved! Project cost ledgers and CSI division spending updated dynamically.`);
+    try { await api.changeOrders.update(id, { status: "Approved" }); } catch {/* keep optimistic */}
+    alert(`Change order "${co.title}" approved! Project cost ledgers and CSI division spending updated.`);
   };
 
-  const handleDeclineChangeOrder = (id: string) => {
-    setChangeOrders(prev => prev.map(c => c.id === id ? { ...c, status: "Declined" } : c));
+  const handleDeclineChangeOrder = async (id: string) => {
+    setChangeOrders(prev => prev.map(c => c.id === id ? { ...c, status: "Declined" as const } : c));
+    try { await api.changeOrders.update(id, { status: "Declined" }); } catch {/* keep optimistic */}
   };
 
-  // Helper to change tab & close drawer
   const navigateTo = (tab: ActiveTab) => {
     setActiveTab2(tab);
     setActiveFinancialLink("");
@@ -280,16 +303,15 @@ export default function App() {
 
   const pendingCOs = changeOrders.filter(co => co.status === "Pending").length;
 
-  // Sidebar link items
   const mainNavLinks = [
-    { id: "dashboard",  label: "Dashboard",      icon: LayoutDashboard },
-    { id: "projects",   label: "Projects",        icon: Briefcase },
-    { id: "tasks",      label: "Tasks",           icon: CheckSquare },
-    { id: "documents",  label: "Documents",       icon: Folder },
-    { id: "estimate",   label: "Proposals",       icon: FileSignature },
-    { id: "staff",      label: "Team",            icon: Users },
-    { id: "timesheets", label: "Time Tracking",   icon: Clock },
-    { id: "invoices",   label: "Invoicing",       icon: Receipt },
+    { id: "dashboard",  label: "Dashboard",    icon: LayoutDashboard },
+    { id: "projects",   label: "Projects",      icon: Briefcase },
+    { id: "tasks",      label: "Tasks",         icon: CheckSquare },
+    { id: "documents",  label: "Documents",     icon: Folder },
+    { id: "estimate",   label: "Proposals",     icon: FileSignature },
+    { id: "staff",      label: "Team",          icon: Users },
+    { id: "timesheets", label: "Time Tracking", icon: Clock },
+    { id: "invoices",   label: "Invoicing",     icon: Receipt },
   ];
 
   const financialNavLinks = [
@@ -298,14 +320,17 @@ export default function App() {
     { id: "documents",    label: "Daily Logs",    icon: BookOpen,      badge: 0 },
   ];
 
+  // Derive display name from email (e.g. "alex@company.com" → "Alex")
+  const displayName = user.email.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  const initials = displayName.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+
   return (
     <div id="contractor-pro-portal" className="flex min-h-screen bg-transparent text-slate-100 antialiased font-sans">
-      
-      {/* Sidebar - Desktop persistent, Mobile absolute */}
+
+      {/* Sidebar */}
       <aside className={`fixed inset-y-0 left-0 z-40 w-60 bg-[#07090f] border-r border-white/[0.07] transform lg:translate-x-0 transition-transform duration-300 ease-in-out flex flex-col ${
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       }`}>
-        {/* Branding */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.07]">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-cyan-500 text-slate-950 flex items-center justify-center shadow-md">
@@ -326,7 +351,6 @@ export default function App() {
           </button>
         </div>
 
-        {/* Main nav */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
           {mainNavLinks.map((link) => {
             const Icon = link.icon;
@@ -348,7 +372,6 @@ export default function App() {
             );
           })}
 
-          {/* Integrated Financials section */}
           <div className="pt-4 mt-2 border-t border-white/[0.07]">
             <p className="px-3 pb-2 text-[9px] font-bold text-slate-600 uppercase tracking-widest font-mono">
               Integrated Financials
@@ -382,7 +405,6 @@ export default function App() {
           </div>
         </nav>
 
-        {/* Bottom actions */}
         <div className="border-t border-white/[0.07] p-3 space-y-0.5">
           <button
             type="button"
@@ -393,6 +415,7 @@ export default function App() {
           </button>
           <button
             type="button"
+            onClick={logout}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium text-slate-400 hover:bg-white/5 hover:text-rose-400 transition"
           >
             <LogOut className="w-4 h-4 shrink-0" />
@@ -403,11 +426,7 @@ export default function App() {
 
       {/* Main Container */}
       <div className="flex-1 lg:pl-60 flex flex-col min-w-0">
-        
-        {/* Top Header navbar */}
         <header className="sticky top-0 z-30 flex items-center justify-between h-14 px-5 bg-[#07090f]/80 backdrop-blur-lg border-b border-white/[0.07]">
-
-          {/* Mobile menu trigger */}
           <button
             type="button"
             aria-label="Open sidebar"
@@ -417,7 +436,6 @@ export default function App() {
             <Menu className="w-5 h-5" />
           </button>
 
-          {/* Search bar */}
           <div className="relative hidden sm:block w-64">
             <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-500" />
             <input
@@ -429,11 +447,10 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Notifications */}
             <button
               type="button"
               aria-label="View notifications"
-              onClick={() => alert("Recent alerts: John Smith logged on-site, Drawings approved")}
+              onClick={() => alert("Recent alerts: Team member logged on-site, Drawings approved")}
               className="relative p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition"
             >
               <Bell className="w-4.5 h-4.5" />
@@ -444,20 +461,18 @@ export default function App() {
               )}
             </button>
 
-            {/* User identity */}
             <div className="flex items-center gap-2.5 pl-3 border-l border-white/[0.07]">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-xs font-bold text-white shadow">
-                AH
+                {initials}
               </div>
               <div className="hidden xl:block text-left leading-none">
-                <span className="text-xs font-semibold text-white block">Alex Hartman</span>
-                <span className="text-[10px] text-slate-500 font-mono">General Contractor</span>
+                <span className="text-xs font-semibold text-white block">{displayName}</span>
+                <span className="text-[10px] text-slate-500 font-mono truncate max-w-[120px]">{user.email}</span>
               </div>
             </div>
           </div>
         </header>
 
-        {/* Core application body contents */}
         <main className="flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto pb-16">
           {activeTab === "dashboard" && (
             <DashboardView
@@ -470,65 +485,57 @@ export default function App() {
               onSelectProject={handleSelectProject}
             />
           )}
-
           {activeTab === "projects" && (
-            <PortfolioView 
-              projects={projects} 
+            <PortfolioView
+              projects={projects}
               onAddProject={handleAddProject}
               onSelectProject={handleSelectProject}
             />
           )}
-
           {activeTab === "tasks" && (
-            <TaskBoardView 
-              tasks={tasks} 
-              projects={projects} 
-              team={team} 
+            <TaskBoardView
+              tasks={tasks}
+              projects={projects}
+              team={team}
               onAddTask={handleAddTask}
               onUpdateTaskStatus={handleUpdateTaskStatus}
               onDeleteTask={handleDeleteTask}
             />
           )}
-
           {activeTab === "documents" && (
-            <DocumentView 
-              documents={documents} 
+            <DocumentView
+              documents={documents}
               onAddDocument={handleAddDocument}
               onDeleteDocument={handleDeleteDocument}
             />
           )}
-
           {activeTab === "estimate" && (
-            <EstimatorView 
-              proposals={proposals} 
+            <EstimatorView
+              proposals={proposals}
               onAddProposal={handleAddProposal}
             />
           )}
-
           {activeTab === "staff" && (
-            <StaffView 
+            <StaffView
               team={team}
               onAddMember={handleAddMember}
             />
           )}
-
           {activeTab === "timesheets" && (
-            <TimesheetView 
-              timeRecords={timeRecords} 
-              projects={projects} 
-              team={team} 
+            <TimesheetView
+              timeRecords={timeRecords}
+              projects={projects}
+              team={team}
               onAddRecord={handleAddRecord}
               onDeleteRecord={handleDeleteRecord}
             />
           )}
-
           {activeTab === "invoices" && (
-            <InvoicesView 
-              invoices={invoices} 
+            <InvoicesView
+              invoices={invoices}
               onAddInvoice={handleAddInvoice}
             />
           )}
-
           {activeTab === "changeorders" && (
             <ChangeOrdersView
               changeOrders={changeOrders}
@@ -537,7 +544,6 @@ export default function App() {
               onDeclineChangeOrder={handleDeclineChangeOrder}
             />
           )}
-
           {activeTab === "budgets" && (
             <BudgetsView
               costCodes={costCodes}
@@ -547,7 +553,7 @@ export default function App() {
         </main>
       </div>
 
-      {/* Project Inspector drawer modal selection */}
+      {/* Project Inspector drawer */}
       {selectedProjectDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-end bg-slate-950/80 backdrop-blur-md p-4">
           <div className="bg-[#0a0d1c] border-l border-slate-800 w-full max-w-md h-full overflow-y-auto p-6 space-y-5 text-xs flex flex-col justify-between">
@@ -566,11 +572,10 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Cover */}
               <div className="relative h-44 rounded-xl overflow-hidden bg-slate-950">
-                <img 
-                  src={selectedProjectDetail.image} 
-                  alt="" 
+                <img
+                  src={selectedProjectDetail.image}
+                  alt=""
                   className="w-full h-full object-cover opacity-75"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0a0d1c] via-transparent" />
@@ -584,19 +589,15 @@ export default function App() {
 
               <p className="text-xs text-slate-400 leading-relaxed font-sans">{selectedProjectDetail.description}</p>
 
-              {/* Progress and financials metrics */}
               <div className="p-4 bg-slate-950 border border-slate-850 rounded-xl space-y-3 font-mono">
                 <div className="flex justify-between items-center">
                   <span className="text-slate-450 uppercase text-[10px]">Division actual spent</span>
                   <span className="text-white font-bold text-sm">${selectedProjectDetail.spent.toLocaleString()}</span>
                 </div>
-
                 <div className="flex justify-between items-center">
                   <span className="text-slate-455 uppercase text-[10px]">Total site budget authorized</span>
                   <span className="text-cyan-404 font-bold text-sm">${selectedProjectDetail.budget.toLocaleString()}</span>
                 </div>
-
-                {/* Progress ratio bar */}
                 <div className="pt-2 border-t border-slate-850/60">
                   <div className="flex justify-between items-center text-[10px] text-slate-455 mb-1 uppercase">
                     <span>Task progress complete</span>
@@ -622,7 +623,6 @@ export default function App() {
           </div>
         </div>
       )}
-
     </div>
   );
 }
