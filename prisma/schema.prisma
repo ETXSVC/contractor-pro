@@ -1,0 +1,216 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  users           User[]
+  projects        Project[]
+  tasks           Task[]
+  documents       Document[]
+  teamMembers     TeamMember[]
+  proposals       Proposal[]
+  invoices        Invoice[]
+  timeRecords     TimeRecord[]
+  budgetCostCodes BudgetCostCode[]
+  changeOrders    ChangeOrder[]
+
+  @@map("tenants")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String
+  password  String
+  name      String
+  role      String   @default("admin")
+  createdAt DateTime @default(now())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([email, tenantId])
+  @@index([tenantId])
+  @@map("users")
+}
+
+model Project {
+  id             String   @id @default(cuid())
+  name           String
+  category       String   @default("In Progress")
+  status         String
+  progress       Int      @default(0)
+  duration       String
+  description    String
+  image          String
+  clientName     String
+  budget         Float
+  spent          Float    @default(0)
+  unreadMessages Int      @default(0)
+  tasksCount     Int      @default(0)
+  lastViewedDate String?
+  alert          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  tasks       Task[]
+  timeRecords TimeRecord[]
+
+  @@index([tenantId])
+  @@map("projects")
+}
+
+model Task {
+  id         String   @id @default(cuid())
+  title      String
+  assigneeId String
+  dueDate    String
+  priority   String   @default("Medium")
+  status     String   @default("To Do")
+  createdAt  DateTime @default(now())
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([projectId])
+  @@map("tasks")
+}
+
+model Document {
+  id         String   @id @default(cuid())
+  name       String
+  category   String
+  uploadedBy String
+  uploadedAt String
+  size       String
+  fileType   String
+  createdAt  DateTime @default(now())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("documents")
+}
+
+model TeamMember {
+  id              String   @id @default(cuid())
+  name            String
+  role            String
+  avatar          String
+  activeProjects  String[]
+  status          String   @default("Online")
+  department      String
+  phone           String
+  email           String
+  createdAt       DateTime @default(now())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("team_members")
+}
+
+model Proposal {
+  id          String   @id @default(cuid())
+  projectName String
+  clientName  String
+  value       Float
+  status      String   @default("Drafting")
+  dateSent    String
+  notes       String
+  createdAt   DateTime @default(now())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("proposals")
+}
+
+model Invoice {
+  id          String   @id @default(cuid())
+  projectName String
+  amount      Float
+  dueDate     String
+  status      String   @default("Pending")
+  createdAt   DateTime @default(now())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("invoices")
+}
+
+model TimeRecord {
+  id           String   @id @default(cuid())
+  employeeId   String
+  employeeName String
+  date         String
+  hours        Float
+  billable     Boolean  @default(true)
+  description  String
+  createdAt    DateTime @default(now())
+
+  projectId   String
+  projectName String
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([projectId])
+  @@map("time_records")
+}
+
+model BudgetCostCode {
+  id          String   @id @default(cuid())
+  code        String
+  description String
+  category    String
+  budgeted    Float
+  actual      Float    @default(0)
+  committed   Float    @default(0)
+  createdAt   DateTime @default(now())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("budget_cost_codes")
+}
+
+model ChangeOrder {
+  id            String   @id @default(cuid())
+  title         String
+  projectId     String
+  projectName   String
+  amount        Float
+  status        String   @default("Pending")
+  dateRequested String
+  createdAt     DateTime @default(now())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("change_orders")
+}
