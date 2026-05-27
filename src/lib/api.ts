@@ -55,6 +55,19 @@ export const api = {
     list: () => request<any[]>("GET", "/documents"),
     create: (data: unknown) => request<any>("POST", "/documents", data),
     delete: (id: string) => request<any>("DELETE", `/documents/${id}`),
+    upload: async (formData: FormData) => {
+      const token = localStorage.getItem("cp_token");
+      const res = await fetch(`${BASE}/documents/upload`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(err.error || "Upload failed");
+      }
+      return res.json();
+    },
   },
   team: {
     list: () => request<any[]>("GET", "/team"),

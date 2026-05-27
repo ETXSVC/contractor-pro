@@ -34,6 +34,7 @@ export interface Document {
   uploadedAt: string;
   size: string;
   fileType: string;
+  fileUrl?: string;
 }
 
 export interface TeamMember {

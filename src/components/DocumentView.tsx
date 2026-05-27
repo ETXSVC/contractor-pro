@@ -1,17 +1,17 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { Document } from "../types";
-import { 
-  Folder, 
-  Search, 
-  Upload, 
-  Download, 
-  Share2, 
-  Trash2, 
-  FileText, 
-  Plus,
+import { api } from "../lib/api";
+import {
+  Folder,
+  Search,
+  Upload,
+  Download,
+  Trash2,
+  FileText,
   Eye,
-  Settings,
-  X
+  X,
+  CheckCircle2,
+  Loader2
 } from "lucide-react";
 
 interface DocumentProps {
@@ -28,56 +28,128 @@ export const DocumentView: React.FC<DocumentProps> = ({
   const [selectedFolder, setSelectedFolder] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
-  // Form upload fields
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState<Document["category"]>("Blueprints");
-  const [newSize, setNewSize] = useState("2.4 MB");
+  const [newSize, setNewSize] = useState("");
+  const [dragOver, setDragOver] = useState(false);
+  const [droppedFile, setDroppedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const folders: { id: string; name: string; count: number; color: string }[] = [
-    { id: "All", name: "All Vault", count: documents.length, color: "text-slate-400 bg-slate-900" },
-    { id: "Blueprints", name: "Blueprints / CAD", count: documents.filter(d => d.category === "Blueprints").length, color: "text-cyan-400 bg-cyan-950/40" },
-    { id: "Permits", name: "Building Permits", count: documents.filter(d => d.category === "Permits").length, color: "text-amber-400 bg-amber-950/40" },
-    { id: "Field Reports", name: "Field Logs", count: documents.filter(d => d.category === "Field Reports").length, color: "text-teal-400 bg-teal-950/40" },
-    { id: "Contracts", name: "Signed Agreements", count: documents.filter(d => d.category === "Contracts").length, color: "text-indigo-400 bg-indigo-950/40" }
+  const folders = [
+    { id: "All",          name: "All Vault",          count: documents.length },
+    { id: "Blueprints",   name: "Blueprints / CAD",   count: documents.filter(d => d.category === "Blueprints").length },
+    { id: "Permits",      name: "Building Permits",   count: documents.filter(d => d.category === "Permits").length },
+    { id: "Field Reports",name: "Field Logs",          count: documents.filter(d => d.category === "Field Reports").length },
+    { id: "Contracts",    name: "Signed Agreements",  count: documents.filter(d => d.category === "Contracts").length },
   ];
 
-  const filteredDocs = documents.filter((doc) => {
+  const filteredDocs = documents.filter(doc => {
     const matchFolder = selectedFolder === "All" || doc.category === selectedFolder;
     const matchSearch = doc.name.toLowerCase().includes(searchQuery.toLowerCase());
     return matchFolder && matchSearch;
   });
 
-  const handleUpload = (e: React.FormEvent) => {
+  const applyFile = (file: File) => {
+    setDroppedFile(file);
+    setNewTitle(file.name);
+    const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+    setNewSize(sizeMB === "0.0" ? "< 0.1 MB" : `${sizeMB} MB`);
+    const n = file.name.toLowerCase();
+    if (n.includes("permit") || n.includes("license") || n.includes("licence")) setNewCategory("Permits");
+    else if (n.includes("contract") || n.includes("agreement") || n.includes("sign")) setNewCategory("Contracts");
+    else if (n.includes("report") || n.includes("log") || n.includes("daily") || n.includes("field")) setNewCategory("Field Reports");
+    else setNewCategory("Blueprints");
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    if (!newTitle) return;
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) applyFile(file);
+  };
 
-    const created: Document = {
-      id: "doc_" + Date.now(),
-      name: newTitle.endsWith(".pdf") || newTitle.endsWith(".xml") || newTitle.endsWith(".docx") ? newTitle : `${newTitle}.pdf`,
-      category: newCategory,
-      uploadedBy: "Alex (General Contractor)",
-      uploadedAt: "Today, Just Now",
-      size: newSize || "1.2 MB",
-      fileType: newCategory === "Blueprints" ? "Architectural Plan PDF" : newCategory === "Permits" ? "Regulatory PDF" : "Office Document"
-    };
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) applyFile(file);
+  };
 
-    onAddDocument(created);
+  const closeModal = () => {
     setShowUploadModal(false);
     setNewTitle("");
+    setNewSize("");
+    setDroppedFile(null);
+    setDragOver(false);
+  };
+
+  const handleUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTitle) return;
+    setUploading(true);
+    try {
+      let created: Document;
+      if (droppedFile) {
+        const fd = new FormData();
+        fd.append("file", droppedFile);
+        fd.append("name", newTitle);
+        fd.append("category", newCategory);
+        fd.append("uploadedBy", "You");
+        fd.append("fileType", newCategory === "Blueprints" ? "Architectural Plan" : newCategory === "Permits" ? "Regulatory PDF" : "Document");
+        created = await api.documents.upload(fd);
+      } else {
+        created = {
+          id: "doc_" + Date.now(),
+          name: newTitle.includes(".") ? newTitle : `${newTitle}.pdf`,
+          category: newCategory,
+          uploadedBy: "You",
+          uploadedAt: "Today, Just Now",
+          size: newSize || "—",
+          fileType: newCategory === "Blueprints" ? "Architectural Plan" : newCategory === "Permits" ? "Regulatory PDF" : "Document",
+        };
+        created = await api.documents.create(created);
+      }
+      onAddDocument(created);
+      closeModal();
+    } catch {
+      alert("Upload failed. Please try again.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleView = (doc: Document) => {
+    if (doc.fileUrl) {
+      window.open(doc.fileUrl, "_blank", "noopener,noreferrer");
+    } else {
+      alert(`No file attached to "${doc.name}".\nUpload a file to enable viewing.`);
+    }
+  };
+
+  const handleDownload = (doc: Document) => {
+    if (doc.fileUrl) {
+      const a = document.createElement("a");
+      a.href = doc.fileUrl;
+      a.download = doc.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } else {
+      alert(`No file attached to "${doc.name}".\nUpload a file to enable downloading.`);
+    }
   };
 
   return (
     <div id="document-vault-view" className="space-y-6">
-      
-      {/* Header section */}
+
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold font-display text-white">Drawing & Document Vault</h1>
           <p className="text-xs text-slate-400">Secure regulatory permit registry, signed agreements, and AutoCAD markup revisions.</p>
         </div>
-
         <button
+          type="button"
           onClick={() => setShowUploadModal(true)}
           className="flex items-center gap-1.5 px-4 py-2 bg-cyan-500 hover:bg-cyan-600 active:scale-95 text-slate-950 text-xs font-bold font-mono rounded-lg transition shadow-md cursor-pointer"
         >
@@ -85,74 +157,78 @@ export const DocumentView: React.FC<DocumentProps> = ({
         </button>
       </div>
 
-      {/* Grid of Folder Bento Cards */}
+      {/* Folder cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        {folders.map((f) => (
+        {folders.map(f => (
           <div
             key={f.id}
+            role="button"
+            tabIndex={0}
             onClick={() => setSelectedFolder(f.id)}
+            onKeyDown={e => e.key === "Enter" && setSelectedFolder(f.id)}
             className={`p-4 rounded-xl border transition cursor-pointer flex flex-col justify-between h-28 ${
               selectedFolder === f.id
-                ? "bg-slate-900 border-cyan-500/40 text-cyan-400 glow-cyan"
+                ? "bg-slate-900 border-cyan-500/40 text-cyan-400"
                 : "bg-slate-900/40 border-slate-800 hover:border-slate-700 text-slate-400"
             }`}
           >
-            <Folder className={`w-6 h-6 ${selectedFolder === f.id ? "text-cyan-400" : "text-slate-450"}`} />
+            <Folder className={`w-6 h-6 ${selectedFolder === f.id ? "text-cyan-400" : "text-slate-500"}`} />
             <div>
               <h4 className="text-xs font-bold text-white line-clamp-1">{f.name}</h4>
-              <span className="text-[10px] font-mono text-slate-450">{f.count} items stored</span>
+              <span className="text-[10px] font-mono text-slate-500">{f.count} items stored</span>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Search Input Bar */}
+      {/* Search bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl bg-slate-900/40 border border-slate-800">
-        <span className="text-xs font-bold font-mono text-slate-350">
+        <span className="text-xs font-bold font-mono text-slate-400">
           Showing {filteredDocs.length} of {documents.length} digital files
         </span>
-
         <div className="relative w-full sm:w-80">
-          <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-450" />
+          <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
           <input
             type="text"
             placeholder="Search specific file names..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={e => setSearchQuery(e.target.value)}
             className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-4 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 transition"
           />
         </div>
       </div>
 
-      {/* Roster Table of Documents */}
+      {/* Documents table */}
       <div className="bg-slate-900/60 rounded-xl border border-slate-800 overflow-hidden">
         <table className="w-full text-xs text-left">
           <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 uppercase font-mono text-[10px]">
             <tr>
               <th className="p-3">File Title</th>
-              <th className="p-3">Vault folder</th>
+              <th className="p-3">Vault Folder</th>
               <th className="p-3">Uploaded By</th>
               <th className="p-3">Revision Date</th>
-              <th className="p-3">Memory Size</th>
+              <th className="p-3">Size</th>
               <th className="p-3 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/50 text-slate-350">
-            {filteredDocs.map((doc) => (
-              <tr key={doc.id} className="hover:bg-slate-850/40 transition">
-                <td className="p-3 font-semibold text-white flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-cyan-450 flex-shrink-0" />
-                  <span>{doc.name}</span>
+          <tbody className="divide-y divide-slate-800/50 text-slate-400">
+            {filteredDocs.map(doc => (
+              <tr key={doc.id} className="hover:bg-slate-800/20 transition">
+                <td className="p-3 font-semibold text-white">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-cyan-500 flex-shrink-0" />
+                    <span className="truncate max-w-[200px]">{doc.name}</span>
+                    {!doc.fileUrl && (
+                      <span className="text-[9px] text-slate-600 font-mono px-1.5 py-0.5 border border-slate-700 rounded">metadata only</span>
+                    )}
+                  </div>
                 </td>
                 <td className="p-3">
                   <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-mono ${
-                    doc.category === "Blueprints" 
-                      ? "bg-cyan-500/10 text-cyan-400" 
-                      : doc.category === "Permits"
-                      ? "bg-amber-500/10 text-amber-500"
-                      : doc.category === "Field Reports"
-                      ? "bg-teal-500/10 text-teal-400"
-                      : "bg-indigo-500/10 text-indigo-400"
+                    doc.category === "Blueprints"    ? "bg-cyan-500/10 text-cyan-400" :
+                    doc.category === "Permits"       ? "bg-amber-500/10 text-amber-400" :
+                    doc.category === "Field Reports" ? "bg-teal-500/10 text-teal-400" :
+                                                       "bg-indigo-500/10 text-indigo-400"
                   }`}>
                     {doc.category}
                   </span>
@@ -161,27 +237,32 @@ export const DocumentView: React.FC<DocumentProps> = ({
                 <td className="p-3 font-mono text-slate-400">{doc.uploadedAt}</td>
                 <td className="p-3 font-mono">{doc.size}</td>
                 <td className="p-3 text-right">
-                  <div className="flex items-center justify-end gap-1.5">
-                    <button 
-                      onClick={() => alert(`Reviewing Blueprint Sheet Content: ${doc.name}`)}
-                      title="Inspect PDF File" 
-                      className="p-1 px-1.5 rounded hover:bg-slate-800 hover:text-white transition cursor-pointer"
+                  <div className="flex items-center justify-end gap-1">
+                    <button
+                      type="button"
+                      title="View file"
+                      onClick={() => handleView(doc)}
+                      disabled={!doc.fileUrl}
+                      className="p-1.5 rounded hover:bg-slate-800 transition disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <Eye className="w-4 h-4 text-slate-400 hover:text-cyan-400" />
                     </button>
-                    <button 
-                      onClick={() => alert(`Initiating secure local network download for ${doc.name}`)}
-                      title="Download Sheet" 
-                      className="p-1 px-1.5 rounded hover:bg-slate-800 hover:text-white transition cursor-pointer"
+                    <button
+                      type="button"
+                      title="Download file"
+                      onClick={() => handleDownload(doc)}
+                      disabled={!doc.fileUrl}
+                      className="p-1.5 rounded hover:bg-slate-800 transition disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <Download className="w-4 h-4 text-slate-400 hover:text-cyan-400" />
                     </button>
-                    <button 
+                    <button
+                      type="button"
+                      title="Delete document"
                       onClick={() => onDeleteDocument(doc.id)}
-                      title="Archive File"
-                      className="p-1 px-1.5 rounded hover:bg-slate-800/80 hover:text-rose-450 transition cursor-pointer"
+                      className="p-1.5 rounded hover:bg-slate-800 transition"
                     >
-                      <Trash2 className="w-4 h-4 text-slate-450 hover:text-rose-400" />
+                      <Trash2 className="w-4 h-4 text-slate-400 hover:text-rose-400" />
                     </button>
                   </div>
                 </td>
@@ -189,7 +270,7 @@ export const DocumentView: React.FC<DocumentProps> = ({
             ))}
             {filteredDocs.length === 0 && (
               <tr>
-                <td colSpan={6} className="p-8 text-center text-slate-450 font-mono">
+                <td colSpan={6} className="p-8 text-center text-slate-500 font-mono">
                   No blueprints, field sheets, or agreements listed.
                 </td>
               </tr>
@@ -198,26 +279,26 @@ export const DocumentView: React.FC<DocumentProps> = ({
         </table>
       </div>
 
-      {/* Interactive Modal: SOW File upload mock */}
+      {/* Upload modal */}
       {showUploadModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 text-xs">
-            
+
             <div className="flex justify-between items-center pb-2 border-b border-slate-800">
               <h3 className="text-base font-bold text-white font-display">Upload Blueprint Sheet or Permit</h3>
-              <button onClick={() => setShowUploadModal(false)} className="p-1 text-slate-400 hover:text-white rounded">
+              <button type="button" title="Close" onClick={closeModal} className="p-1 text-slate-400 hover:text-white rounded">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <form onSubmit={handleUpload} className="space-y-4">
               <div>
-                <label className="block text-slate-450 font-mono mb-1">Document File Name *</label>
+                <label className="block text-slate-400 font-mono mb-1">Document File Name *</label>
                 <input
                   type="text"
                   required
                   value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
+                  onChange={e => setNewTitle(e.target.value)}
                   placeholder="e.g. Master Foundation Layout Draft E.pdf"
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white focus:outline-none focus:border-cyan-500"
                 />
@@ -225,10 +306,11 @@ export const DocumentView: React.FC<DocumentProps> = ({
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-slate-450 font-mono mb-1">Vault Folder Type</label>
+                  <label className="block text-slate-400 font-mono mb-1">Vault Folder Type</label>
                   <select
+                    title="Vault folder type"
                     value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value as any)}
+                    onChange={e => setNewCategory(e.target.value as Document["category"])}
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white focus:outline-none focus:border-cyan-500"
                   >
                     <option value="Blueprints">Blueprints / CAD</option>
@@ -237,39 +319,67 @@ export const DocumentView: React.FC<DocumentProps> = ({
                     <option value="Contracts">Signed Agreements</option>
                   </select>
                 </div>
-
                 <div>
-                  <label className="block text-slate-450 font-mono mb-1">Estimated File Weight</label>
+                  <label className="block text-slate-400 font-mono mb-1">File Size</label>
                   <input
                     type="text"
                     value={newSize}
-                    onChange={(e) => setNewSize(e.target.value)}
-                    placeholder="e.g. 5.8 MB"
+                    onChange={e => setNewSize(e.target.value)}
+                    placeholder="auto-detected on drop"
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white focus:outline-none focus:border-cyan-500"
                   />
                 </div>
               </div>
 
-              {/* Drag drop zone placeholder */}
-              <div className="border border-dashed border-slate-800 hover:border-cyan-500/60 bg-slate-950 rounded-xl p-6 text-center transition">
-                <Upload className="w-8 h-8 text-slate-500 mx-auto mb-2" />
-                <span className="text-xs text-slate-400 block font-semibold">Drag & Drop drawings here</span>
-                <span className="text-[10px] text-slate-500 block mt-1">Accepts PDF, DWG, BIMx, DOCX up to 50MB</span>
+              {/* Drop zone */}
+              <div
+                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                onDragEnter={e => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`border border-dashed rounded-xl p-6 text-center transition cursor-pointer select-none ${
+                  dragOver      ? "border-cyan-500 bg-cyan-500/5" :
+                  droppedFile   ? "border-emerald-500/50 bg-emerald-500/5" :
+                                  "border-slate-700 hover:border-cyan-500/40 bg-slate-950"
+                }`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  title="Upload document"
+                  accept=".pdf,.dwg,.docx,.bimx,.png,.jpg,.jpeg,.xlsx,.dxf"
+                  className="hidden"
+                  onChange={handleFileInput}
+                />
+                {droppedFile ? (
+                  <>
+                    <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
+                    <span className="text-xs text-emerald-400 block font-semibold truncate px-4">{droppedFile.name}</span>
+                    <span className="text-[10px] text-slate-500 block mt-1">{newSize} · Click to swap file</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className={`w-8 h-8 mx-auto mb-2 transition ${dragOver ? "text-cyan-400 scale-110" : "text-slate-500"}`} />
+                    <span className={`text-xs block font-semibold ${dragOver ? "text-cyan-400" : "text-slate-400"}`}>
+                      {dragOver ? "Drop to attach" : "Drag & Drop drawings here"}
+                    </span>
+                    <span className="text-[10px] text-slate-500 block mt-1">or click to browse · PDF, DWG, BIMx, DOCX up to 50MB</span>
+                  </>
+                )}
               </div>
 
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setShowUploadModal(false)}
-                  className="px-4 py-2 border border-slate-800 text-slate-350 hover:bg-slate-800 rounded"
-                >
+                <button type="button" onClick={closeModal} className="px-4 py-2 border border-slate-800 text-slate-400 hover:bg-slate-800 rounded transition">
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 font-bold font-mono text-slate-950 rounded cursor-pointer"
+                  disabled={uploading}
+                  className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 font-bold font-mono text-slate-950 rounded cursor-pointer transition disabled:opacity-50 flex items-center gap-2"
                 >
-                  Upload & Register
+                  {uploading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {uploading ? "Uploading…" : "Upload & Register"}
                 </button>
               </div>
             </form>

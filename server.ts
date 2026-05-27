@@ -19,6 +19,10 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
+// Serve uploaded files
+const uploadsPath = path.join(process.cwd(), "uploads");
+app.use("/uploads", express.static(uploadsPath));
+
 const PORT = Number(process.env.PORT) || 3000;
 
 // Auth (no JWT required)
