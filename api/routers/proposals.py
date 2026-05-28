@@ -1,10 +1,10 @@
 import uuid
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.models import Proposal
-from api.schemas import ProposalCreate, ProposalOut
+from api.schemas import ProposalCreate, ProposalUpdate, ProposalOut
 from api.deps import get_db, get_current_user
 
 router = APIRouter()
@@ -34,3 +34,34 @@ async def create_proposal(data: ProposalCreate, db: AsyncSession = Depends(get_d
     await db.commit()
     await db.refresh(proposal)
     return ProposalOut.from_orm_row(proposal)
+
+
+@router.patch("/{proposal_id}")
+async def update_proposal(proposal_id: str, data: ProposalUpdate, db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
+    result = await db.execute(
+        select(Proposal).where(Proposal.id == proposal_id, Proposal.tenant_id == user["tenant_id"])
+    )
+    proposal = result.scalars().first()
+    if not proposal:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+
+    field_map = {"projectName": "project_name", "clientName": "client_name", "dateSent": "date_sent"}
+    for key, val in data.model_dump(exclude_unset=True).items():
+        setattr(proposal, field_map.get(key, key), val)
+
+    await db.commit()
+    await db.refresh(proposal)
+    return ProposalOut.from_orm_row(proposal)
+
+
+@router.delete("/{proposal_id}")
+async def delete_proposal(proposal_id: str, db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
+    result = await db.execute(
+        select(Proposal).where(Proposal.id == proposal_id, Proposal.tenant_id == user["tenant_id"])
+    )
+    proposal = result.scalars().first()
+    if not proposal:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+    await db.delete(proposal)
+    await db.commit()
+    return {"success": True}

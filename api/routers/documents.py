@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.models import Document, Tenant
 from api.schemas import DocumentCreate, DocumentUpdate, DocumentOut
 from api.deps import get_db, get_current_user
+from api.worker import parse_dwg
 
 router = APIRouter()
 
@@ -102,6 +103,10 @@ async def upload_document(
     db.add(doc)
     await db.commit()
     await db.refresh(doc)
+
+    if ext in {".dwg", ".dxf"}:
+        parse_dwg.delay(str(tenant_path / unique))
+
     return DocumentOut.from_orm_row(doc)
 
 

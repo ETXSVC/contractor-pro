@@ -220,6 +220,16 @@ function AppShell({ user, logout }: { user: { id: string; email: string; tenantI
     } catch {/* keep optimistic */}
   };
 
+  const handleUpdateMember = async (memberId: string, patch: Partial<TeamMember>) => {
+    setTeam(prev => prev.map(m => m.id === memberId ? { ...m, ...patch } : m));
+    try { await api.team.update(memberId, patch); } catch {/* keep optimistic */}
+  };
+
+  const handleDeleteMember = async (memberId: string) => {
+    setTeam(prev => prev.filter(m => m.id !== memberId));
+    try { await api.team.delete(memberId); } catch {/* keep optimistic */}
+  };
+
   const handleAddProposal = async (prop: Proposal) => {
     setProposals(prev => [prop, ...prev]);
     if (prop.status === "Approved") {
@@ -245,6 +255,16 @@ function AppShell({ user, logout }: { user: { id: string; email: string; tenantI
       const created = await api.proposals.create(prop);
       setProposals(prev => prev.map(x => x.id === prop.id ? { ...x, id: created.id } : x));
     } catch {/* keep optimistic */}
+  };
+
+  const handleUpdateProposal = async (proposalId: string, patch: Partial<Proposal>) => {
+    setProposals(prev => prev.map(p => p.id === proposalId ? { ...p, ...patch } : p));
+    try { await api.proposals.update(proposalId, patch); } catch {/* keep optimistic */}
+  };
+
+  const handleDeleteProposal = async (proposalId: string) => {
+    setProposals(prev => prev.filter(p => p.id !== proposalId));
+    try { await api.proposals.delete(proposalId); } catch {/* keep optimistic */}
   };
 
   const handleAddInvoice = async (inv: Invoice) => {
@@ -519,12 +539,16 @@ function AppShell({ user, logout }: { user: { id: string; email: string; tenantI
             <EstimatorView
               proposals={proposals}
               onAddProposal={handleAddProposal}
+              onUpdateProposal={handleUpdateProposal}
+              onDeleteProposal={handleDeleteProposal}
             />
           )}
           {activeTab === "staff" && (
             <StaffView
               team={team}
               onAddMember={handleAddMember}
+              onUpdateMember={handleUpdateMember}
+              onDeleteMember={handleDeleteMember}
             />
           )}
           {activeTab === "timesheets" && (

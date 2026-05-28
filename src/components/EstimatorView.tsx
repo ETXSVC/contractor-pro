@@ -1,28 +1,26 @@
 import React, { useState } from "react";
 import { Proposal } from "../types";
-import { 
-  Sparkles, 
-  Layers, 
-  MapPin, 
-  DollarSign, 
-  TrendingUp, 
-  ArrowUpRight,
+import {
+  Sparkles,
   Calculator,
   Loader2,
-  Calendar,
   AlertCircle,
   FileCheck2,
-  Plus
+  Trash2,
 } from "lucide-react";
 
 interface EstimatorProps {
   proposals: Proposal[];
   onAddProposal: (prop: Proposal) => void;
+  onUpdateProposal: (id: string, patch: Partial<Proposal>) => void;
+  onDeleteProposal: (id: string) => void;
 }
 
 export const EstimatorView: React.FC<EstimatorProps> = ({
   proposals,
-  onAddProposal
+  onAddProposal,
+  onUpdateProposal,
+  onDeleteProposal,
 }) => {
   // AI Estimator input states
   const [estProjName, setEstProjName] = useState("");
@@ -362,36 +360,56 @@ export const EstimatorView: React.FC<EstimatorProps> = ({
           </div>
 
           <div className="space-y-3.5">
-            {proposals.map((prop) => (
-              <div key={prop.id} className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-3 group hover:border-slate-700/80 transition">
-                <div className="flex justify-between items-start gap-2">
-                  <div>
-                    <h3 className="font-semibold text-white leading-tight group-hover:text-cyan-400 transition">{prop.projectName}</h3>
-                    <span className="text-[10px] text-slate-450 font-mono mt-1 block">Client: {prop.clientName} | {prop.dateSent}</span>
+            {proposals.map((prop) => {
+              const nextStatus: Record<string, Proposal["status"]> = {
+                Drafting: "Sent", Sent: "Approved", Approved: "Declined", Declined: "Drafting"
+              };
+              return (
+                <div key={prop.id} className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-3 group hover:border-slate-700/80 transition">
+                  <div className="flex justify-between items-start gap-2">
+                    <div>
+                      <h3 className="font-semibold text-white leading-tight group-hover:text-cyan-400 transition">{prop.projectName}</h3>
+                      <span className="text-[10px] text-slate-450 font-mono mt-1 block">Client: {prop.clientName} | {prop.dateSent}</span>
+                    </div>
+                    <button
+                      type="button"
+                      title={`Advance status (currently ${prop.status})`}
+                      onClick={() => onUpdateProposal(prop.id, { status: nextStatus[prop.status] ?? "Drafting" })}
+                      className={`px-2 py-0.5 rounded text-[9px] uppercase font-mono font-bold cursor-pointer transition hover:opacity-80 ${
+                        prop.status === "Approved"
+                          ? "bg-emerald-500 text-slate-950"
+                          : prop.status === "Sent"
+                          ? "bg-amber-400 text-slate-950"
+                          : prop.status === "Drafting"
+                          ? "bg-cyan-400 text-slate-950"
+                          : "bg-slate-800 text-slate-400"
+                      }`}
+                    >
+                      {prop.status}
+                    </button>
                   </div>
-                  <span className={`px-2 py-0.5 rounded text-[9px] uppercase font-mono font-bold ${
-                    prop.status === "Approved" 
-                      ? "bg-emerald-450 text-slate-950" 
-                      : prop.status === "Sent"
-                      ? "bg-amber-400 text-slate-950"
-                      : prop.status === "Drafting"
-                      ? "bg-cyan-400 text-slate-950"
-                      : "bg-slate-800 text-slate-400"
-                  }`}>
-                    {prop.status}
-                  </span>
-                </div>
 
-                <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed font-sans border-t border-slate-850/60 pt-2.5">
-                  {prop.notes}
-                </p>
+                  <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed font-sans border-t border-slate-850/60 pt-2.5">
+                    {prop.notes}
+                  </p>
 
-                <div className="flex justify-between items-center text-xs font-mono text-slate-450">
-                  <span>Gross SOW Sourcing Value</span>
-                  <span className="text-white font-bold text-sm">${prop.value.toLocaleString()}</span>
+                  <div className="flex justify-between items-center text-xs font-mono text-slate-450">
+                    <span>Gross SOW Sourcing Value</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-white font-bold text-sm">${prop.value.toLocaleString()}</span>
+                      <button
+                        type="button"
+                        title="Delete proposal"
+                        onClick={() => { if (confirm(`Delete proposal "${prop.projectName}"?`)) onDeleteProposal(prop.id); }}
+                        className="text-slate-600 hover:text-rose-400 transition"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

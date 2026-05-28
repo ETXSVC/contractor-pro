@@ -1,30 +1,58 @@
 import React, { useState } from "react";
 import { TeamMember } from "../types";
-import { 
-  Users, 
-  MapPin, 
-  Phone, 
-  Mail, 
-  Plus, 
-  Search, 
+import {
+  MapPin,
+  Phone,
+  Mail,
+  Plus,
+  Search,
   X,
-  MessageSquare
+  Pencil,
+  Trash2
 } from "lucide-react";
 
 interface StaffProps {
   team: TeamMember[];
   onAddMember: (member: TeamMember) => void;
+  onUpdateMember: (id: string, patch: Partial<TeamMember>) => void;
+  onDeleteMember: (id: string) => void;
 }
 
 type StaffTab = "All Staff" | "Management" | "Electricians" | "Plumbing" | "Carpentry";
 
 export const StaffView: React.FC<StaffProps> = ({
   team,
-  onAddMember
+  onAddMember,
+  onUpdateMember,
+  onDeleteMember,
 }) => {
   const [activeTab, setActiveTab] = useState<StaffTab>("All Staff");
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+
+  // Edit modal state
+  const [editMember, setEditMember] = useState<TeamMember | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editRole, setEditRole] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editStatus, setEditStatus] = useState("");
+
+  const openEdit = (m: TeamMember) => {
+    setEditMember(m);
+    setEditName(m.name);
+    setEditRole(m.role);
+    setEditPhone(m.phone);
+    setEditEmail(m.email);
+    setEditStatus(m.status);
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editMember) return;
+    onUpdateMember(editMember.id, { name: editName, role: editRole, phone: editPhone, email: editEmail, status: editStatus as TeamMember["status"] });
+    setEditMember(null);
+  };
 
   // Form states
   const [newName, setNewName] = useState("");
@@ -183,6 +211,26 @@ export const StaffView: React.FC<StaffProps> = ({
                 <span className="truncate">{member.email}</span>
               </div>
             </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 pt-1 border-t border-slate-850/60">
+              <button
+                type="button"
+                onClick={() => openEdit(member)}
+                title="Edit member"
+                className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[10px] font-mono text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 rounded transition"
+              >
+                <Pencil className="w-3 h-3" /> Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => { if (confirm(`Remove ${member.name} from team?`)) onDeleteMember(member.id); }}
+                title="Remove member"
+                className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[10px] font-mono text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded transition"
+              >
+                <Trash2 className="w-3 h-3" /> Remove
+              </button>
+            </div>
           </div>
         ))}
         {filtered.length === 0 && (
@@ -191,6 +239,65 @@ export const StaffView: React.FC<StaffProps> = ({
           </div>
         )}
       </div>
+
+      {/* Edit member modal */}
+      {editMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 text-xs">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+              <h3 className="text-base font-bold text-white font-display">Edit Team Member</h3>
+              <button type="button" onClick={() => setEditMember(null)} className="p-1 text-slate-400 hover:text-white rounded">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              <div>
+                <label className="block text-slate-400 font-mono mb-1">Name</label>
+                <input type="text" required value={editName} onChange={e => setEditName(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white focus:outline-none focus:border-cyan-500" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-400 font-mono mb-1">Role</label>
+                  <input type="text" required value={editRole} onChange={e => setEditRole(e.target.value)}
+                    title="Role" placeholder="e.g. Lead Carpenter"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white focus:outline-none focus:border-cyan-500" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-mono mb-1">Status</label>
+                  <select value={editStatus} onChange={e => setEditStatus(e.target.value)}
+                    title="Status"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white focus:outline-none focus:border-cyan-500">
+                    <option value="Online">Online</option>
+                    <option value="In Meeting">In Meeting</option>
+                    <option value="Offline">Offline</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-400 font-mono mb-1">Phone</label>
+                  <input type="text" value={editPhone} onChange={e => setEditPhone(e.target.value)}
+                    title="Phone" placeholder="555-0100"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white focus:outline-none focus:border-cyan-500" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-mono mb-1">Email</label>
+                  <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)}
+                    title="Email" placeholder="name@company.com"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white focus:outline-none focus:border-cyan-500" />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                <button type="button" onClick={() => setEditMember(null)}
+                  className="px-4 py-2 border border-slate-800 text-slate-400 hover:bg-slate-800 rounded">Cancel</button>
+                <button type="submit"
+                  className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 font-bold font-mono text-slate-950 rounded cursor-pointer">Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Dynamic Add member modal dialog */}
       {showAddModal && (

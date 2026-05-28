@@ -44,6 +44,7 @@ export const api = {
     create: (data: unknown) => request<any>("POST", "/projects", data),
     update: (id: string, data: unknown) => request<any>("PATCH", `/projects/${id}`, data),
     delete: (id: string) => request<any>("DELETE", `/projects/${id}`),
+    report: (id: string) => request<any>("POST", `/projects/${id}/report`),
   },
   tasks: {
     list: () => request<any[]>("GET", "/tasks"),
@@ -73,10 +74,14 @@ export const api = {
   team: {
     list: () => request<any[]>("GET", "/team"),
     create: (data: unknown) => request<any>("POST", "/team", data),
+    update: (id: string, data: unknown) => request<any>("PATCH", `/team/${id}`, data),
+    delete: (id: string) => request<any>("DELETE", `/team/${id}`),
   },
   proposals: {
     list: () => request<any[]>("GET", "/proposals"),
     create: (data: unknown) => request<any>("POST", "/proposals", data),
+    update: (id: string, data: unknown) => request<any>("PATCH", `/proposals/${id}`, data),
+    delete: (id: string) => request<any>("DELETE", `/proposals/${id}`),
   },
   invoices: {
     list: () => request<any[]>("GET", "/invoices"),

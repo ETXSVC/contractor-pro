@@ -200,6 +200,16 @@ class TeamMemberCreate(BaseModel):
     phone: str
     email: str
 
+class TeamMemberUpdate(BaseModel):
+    name: Optional[str] = None
+    role: Optional[str] = None
+    avatar: Optional[str] = None
+    activeProjects: Optional[list[str]] = None
+    status: Optional[str] = None
+    department: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+
 class TeamMemberOut(BaseModel):
     id: str
     name: str
@@ -237,6 +247,14 @@ class ProposalCreate(BaseModel):
     status: str = "Drafting"
     dateSent: str
     notes: str
+
+class ProposalUpdate(BaseModel):
+    projectName: Optional[str] = None
+    clientName: Optional[str] = None
+    value: Optional[float] = None
+    status: Optional[str] = None
+    dateSent: Optional[str] = None
+    notes: Optional[str] = None
 
 class ProposalOut(BaseModel):
     id: str

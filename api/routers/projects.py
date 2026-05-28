@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.models import Project
 from api.schemas import ProjectCreate, ProjectUpdate, ProjectOut
 from api.deps import get_db, get_current_user
+from api.worker import generate_pdf_report
 
 router = APIRouter()
 
@@ -74,3 +75,15 @@ async def delete_project(project_id: str, db: AsyncSession = Depends(get_db), us
     await db.delete(project)
     await db.commit()
     return {"success": True}
+
+
+@router.post("/{project_id}/report")
+async def generate_report(project_id: str, db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
+    result = await db.execute(
+        select(Project).where(Project.id == project_id, Project.tenant_id == user["tenant_id"])
+    )
+    project = result.scalars().first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    task = generate_pdf_report.delay(project_id, user["tenant_id"])
+    return {"taskId": task.id, "status": "queued"}
