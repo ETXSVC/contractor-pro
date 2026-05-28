@@ -10,7 +10,7 @@ class Tenant(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     name: Mapped[str] = mapped_column(String)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), name="createdAt")
 
 
 class User(Base):
@@ -21,8 +21,8 @@ class User(Base):
     password: Mapped[str] = mapped_column(String)
     name: Mapped[str] = mapped_column(String)
     role: Mapped[str] = mapped_column(String, default="admin")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    tenant_id: Mapped[str] = mapped_column(String, ForeignKey("tenants.id", ondelete="CASCADE"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), name="createdAt")
+    tenant_id: Mapped[str] = mapped_column(String, ForeignKey("tenants.id", ondelete="CASCADE"), name="tenantId")
 
 
 class Project(Base):
@@ -43,8 +43,8 @@ class Project(Base):
     tasks_count: Mapped[int] = mapped_column(Integer, default=0, name="tasksCount")
     last_viewed_date: Mapped[str | None] = mapped_column(String, nullable=True, name="lastViewedDate")
     alert: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), name="createdAt")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), name="updatedAt")
     tenant_id: Mapped[str] = mapped_column(String, ForeignKey("tenants.id", ondelete="CASCADE"), name="tenantId")
 
 
@@ -57,7 +57,7 @@ class Task(Base):
     due_date: Mapped[str] = mapped_column(String, name="dueDate")
     priority: Mapped[str] = mapped_column(String, default="Medium")
     status: Mapped[str] = mapped_column(String, default="To Do")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), name="createdAt")
     project_id: Mapped[str] = mapped_column(String, ForeignKey("projects.id", ondelete="CASCADE"), name="projectId")
     tenant_id: Mapped[str] = mapped_column(String, ForeignKey("tenants.id", ondelete="CASCADE"), name="tenantId")
 
@@ -73,7 +73,7 @@ class Document(Base):
     size: Mapped[str] = mapped_column(String)
     file_type: Mapped[str] = mapped_column(String, name="fileType")
     file_url: Mapped[str | None] = mapped_column(String, nullable=True, name="fileUrl")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), name="createdAt")
     tenant_id: Mapped[str] = mapped_column(String, ForeignKey("tenants.id", ondelete="CASCADE"), name="tenantId")
 
 
@@ -89,7 +89,7 @@ class TeamMember(Base):
     department: Mapped[str] = mapped_column(String)
     phone: Mapped[str] = mapped_column(String)
     email: Mapped[str] = mapped_column(String)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), name="createdAt")
     tenant_id: Mapped[str] = mapped_column(String, ForeignKey("tenants.id", ondelete="CASCADE"), name="tenantId")
 
 
@@ -103,7 +103,7 @@ class Proposal(Base):
     status: Mapped[str] = mapped_column(String, default="Drafting")
     date_sent: Mapped[str] = mapped_column(String, name="dateSent")
     notes: Mapped[str] = mapped_column(String)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), name="createdAt")
     tenant_id: Mapped[str] = mapped_column(String, ForeignKey("tenants.id", ondelete="CASCADE"), name="tenantId")
 
 
@@ -115,7 +115,7 @@ class Invoice(Base):
     amount: Mapped[float] = mapped_column(Float)
     due_date: Mapped[str] = mapped_column(String, name="dueDate")
     status: Mapped[str] = mapped_column(String, default="Pending")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), name="createdAt")
     tenant_id: Mapped[str] = mapped_column(String, ForeignKey("tenants.id", ondelete="CASCADE"), name="tenantId")
 
 
@@ -129,7 +129,7 @@ class TimeRecord(Base):
     hours: Mapped[float] = mapped_column(Float)
     billable: Mapped[bool] = mapped_column(Boolean, default=True)
     description: Mapped[str] = mapped_column(String)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), name="createdAt")
     project_id: Mapped[str] = mapped_column(String, ForeignKey("projects.id", ondelete="CASCADE"), name="projectId")
     project_name: Mapped[str] = mapped_column(String, name="projectName")
     tenant_id: Mapped[str] = mapped_column(String, ForeignKey("tenants.id", ondelete="CASCADE"), name="tenantId")
@@ -145,7 +145,7 @@ class BudgetCostCode(Base):
     budgeted: Mapped[float] = mapped_column(Float)
     actual: Mapped[float] = mapped_column(Float, default=0)
     committed: Mapped[float] = mapped_column(Float, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), name="createdAt")
     tenant_id: Mapped[str] = mapped_column(String, ForeignKey("tenants.id", ondelete="CASCADE"), name="tenantId")
 
 
@@ -159,5 +159,5 @@ class ChangeOrder(Base):
     amount: Mapped[float] = mapped_column(Float)
     status: Mapped[str] = mapped_column(String, default="Pending")
     date_requested: Mapped[str] = mapped_column(String, name="dateRequested")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), name="createdAt")
     tenant_id: Mapped[str] = mapped_column(String, ForeignKey("tenants.id", ondelete="CASCADE"), name="tenantId")

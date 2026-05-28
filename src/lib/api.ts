@@ -54,6 +54,7 @@ export const api = {
   documents: {
     list: () => request<any[]>("GET", "/documents"),
     create: (data: unknown) => request<any>("POST", "/documents", data),
+    update: (id: string, data: unknown) => request<any>("PATCH", `/documents/${id}`, data),
     delete: (id: string) => request<any>("DELETE", `/documents/${id}`),
     upload: async (formData: FormData) => {
       const token = localStorage.getItem("cp_token");

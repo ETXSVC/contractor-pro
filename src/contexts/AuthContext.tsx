@@ -30,8 +30,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    localStorage.removeItem("cp_token");
-    localStorage.removeItem("cp_user");
+    const keys = ["cp_token", "cp_user", "cp_projects", "cp_tasks", "cp_documents",
+      "cp_team", "cp_proposals", "cp_invoices", "cp_changeOrders", "cp_costCodes", "cp_timeRecords"];
+    keys.forEach(k => localStorage.removeItem(k));
     setToken(null);
     setUser(null);
   };

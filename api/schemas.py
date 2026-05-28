@@ -155,6 +155,13 @@ class DocumentCreate(BaseModel):
     fileType: str = ""
     fileUrl: Optional[str] = None
 
+class DocumentUpdate(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    uploadedBy: Optional[str] = None
+    uploadedAt: Optional[str] = None
+    fileType: Optional[str] = None
+
 class DocumentOut(BaseModel):
     id: str
     name: str

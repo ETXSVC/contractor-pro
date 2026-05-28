@@ -5,12 +5,11 @@ echo.
 
 cd /d "d:\Builders Stream Progect\contractor-pro"
 
-:: ── CONFIG ──────────────────────────────────────────────────────────────────
+:: ---------- CONFIG ----------------------------------------------------------
 set VPS=212.28.191.134
 set REGISTRY=212.28.191.134:5000
 set IMAGE=%REGISTRY%/contractor-pro
 
-:: Change JWT_SECRET before going to production!
 set JWT_SECRET=vV4E6pGvJ9fQh2LXK7zN1cDbR3yT8uWmX5aZ0sQeL8nC4vH2gJ9kP7rT1wY6uB3
 
 set DB_USER=contractor
@@ -18,7 +17,7 @@ set DB_PASS=contractor_pass
 set DB_NAME=contractor_pro
 set DB_URL=postgresql://%DB_USER%:%DB_PASS%@contractor-db:5432/%DB_NAME%
 set REDIS_URL=redis://contractor-redis:6379/0
-:: ────────────────────────────────────────────────────────────────────────────
+:: ----------------------------------------------------------------------------
 
 echo [1/5] Building Docker image...
 docker build -t %IMAGE% .
@@ -35,14 +34,14 @@ ssh root@%VPS% "docker network create contractor-net 2>/dev/null; docker run -d 
 if %errorlevel% neq 0 ( echo INFRA SETUP FAILED & pause & exit /b 1 )
 
 echo.
-echo [4/5] Deploying app container on VPS...
-ssh root@%VPS% "docker pull %IMAGE%:latest && docker stop contractor-pro 2>/dev/null; docker rm contractor-pro 2>/dev/null; docker run -d --name contractor-pro --network contractor-net --restart unless-stopped -p 3000:3000 -v contractor_uploads:/app/uploads -e NODE_ENV=production -e DATABASE_URL=%DB_URL% -e JWT_SECRET=%JWT_SECRET% -e CELERY_BROKER_URL=%REDIS_URL% %IMAGE%:latest"
-if %errorlevel% neq 0 ( echo VPS UPDATE FAILED & pause & exit /b 1 )
+echo [4/5] Deploying app + Celery worker on VPS...
+ssh root@%VPS% "docker pull %IMAGE%:latest && docker stop contractor-pro 2>/dev/null; docker rm contractor-pro 2>/dev/null; docker run -d --name contractor-pro --network contractor-net --restart unless-stopped -p 3000:3000 -v contractor_uploads:/app/uploads -e NODE_ENV=production -e DATABASE_URL=%DB_URL% -e JWT_SECRET=%JWT_SECRET% -e CELERY_BROKER_URL=%REDIS_URL% %IMAGE%:latest && docker stop contractor-celery 2>/dev/null; docker rm contractor-celery 2>/dev/null; docker run -d --name contractor-celery --network contractor-net --restart unless-stopped -v contractor_uploads:/app/uploads -e NODE_ENV=production -e DATABASE_URL=%DB_URL% -e JWT_SECRET=%JWT_SECRET% -e CELERY_BROKER_URL=%REDIS_URL% %IMAGE%:latest celery -A api.worker worker --loglevel=info --concurrency=2"
+if %errorlevel% neq 0 ( echo VPS DEPLOY FAILED & pause & exit /b 1 )
 
 echo.
-echo [5/5] Deploying Celery worker on VPS...
-ssh root@%VPS% "docker stop contractor-celery 2>/dev/null; docker rm contractor-celery 2>/dev/null; docker run -d --name contractor-celery --network contractor-net --restart unless-stopped -v contractor_uploads:/app/uploads -e NODE_ENV=production -e DATABASE_URL=%DB_URL% -e JWT_SECRET=%JWT_SECRET% -e CELERY_BROKER_URL=%REDIS_URL% %IMAGE%:latest celery -A api.worker worker --loglevel=info --concurrency=2"
-if %errorlevel% neq 0 ( echo CELERY DEPLOY FAILED & pause & exit /b 1 )
+echo [5/5] Verifying containers on VPS...
+ssh root@%VPS% "docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' | grep contractor"
+if %errorlevel% neq 0 ( echo VERIFY FAILED ^(containers may still be running^) )
 
 echo.
 echo  Done! Site is live at https://xtghost.net

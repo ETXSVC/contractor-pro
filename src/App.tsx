@@ -138,15 +138,15 @@ function AppShell({ user, logout }: { user: { id: string; email: string; tenantI
       api.budgets.list(),
       api.timeRecords.list(),
     ]).then(([apiProjects, apiTasks, apiDocuments, apiTeam, apiProposals, apiInvoices, apiChangeOrders, apiBudgets, apiTimeRecords]) => {
-      if (apiProjects.length)     setProjects(apiProjects);
-      if (apiTasks.length)        setTasks(apiTasks);
-      if (apiDocuments.length)    setDocuments(apiDocuments);
-      if (apiTeam.length)         setTeam(apiTeam);
-      if (apiProposals.length)    setProposals(apiProposals);
-      if (apiInvoices.length)     setInvoices(apiInvoices);
-      if (apiChangeOrders.length) setChangeOrders(apiChangeOrders);
-      if (apiBudgets.length)      setCostCodes(apiBudgets);
-      if (apiTimeRecords.length)  setTimeRecords(apiTimeRecords);
+      setProjects(apiProjects);
+      setTasks(apiTasks);
+      setDocuments(apiDocuments);
+      setTeam(apiTeam);
+      setProposals(apiProposals);
+      setInvoices(apiInvoices);
+      setChangeOrders(apiChangeOrders);
+      setCostCodes(apiBudgets);
+      setTimeRecords(apiTimeRecords);
     }).catch(() => {
       // Backend not reachable — keep local state as-is
     });
@@ -200,6 +200,11 @@ function AppShell({ user, logout }: { user: { id: string; email: string; tenantI
       const created = await api.documents.create(d);
       setDocuments(prev => prev.map(x => x.id === d.id ? { ...x, id: created.id } : x));
     } catch {/* keep optimistic */}
+  };
+
+  const handleUpdateDocument = async (docId: string, patch: Partial<Document>) => {
+    setDocuments(prev => prev.map(d => d.id === docId ? { ...d, ...patch } : d));
+    try { await api.documents.update(docId, patch); } catch {/* keep optimistic */}
   };
 
   const handleDeleteDocument = async (docId: string) => {
@@ -506,6 +511,7 @@ function AppShell({ user, logout }: { user: { id: string; email: string; tenantI
             <DocumentView
               documents={documents}
               onAddDocument={handleAddDocument}
+              onUpdateDocument={handleUpdateDocument}
               onDeleteDocument={handleDeleteDocument}
             />
           )}

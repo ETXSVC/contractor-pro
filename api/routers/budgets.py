@@ -10,7 +10,7 @@ from api.deps import get_db, get_current_user
 router = APIRouter()
 
 
-@router.get("/")
+@router.get("")
 async def list_budgets(db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
     result = await db.execute(
         select(BudgetCostCode).where(BudgetCostCode.tenant_id == user["tenant_id"]).order_by(BudgetCostCode.created_at.desc())
@@ -18,7 +18,7 @@ async def list_budgets(db: AsyncSession = Depends(get_db), user=Depends(get_curr
     return [BudgetOut.from_orm_row(r) for r in result.scalars().all()]
 
 
-@router.post("/")
+@router.post("")
 async def create_budget(data: BudgetCreate, db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
     budget = BudgetCostCode(
         id=str(uuid.uuid4()),

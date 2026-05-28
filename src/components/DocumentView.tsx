@@ -11,25 +11,45 @@ import {
   Eye,
   X,
   CheckCircle2,
-  Loader2
+  Loader2,
+  Pencil
 } from "lucide-react";
 
 interface DocumentProps {
   documents: Document[];
   onAddDocument: (doc: Document) => void;
+  onUpdateDocument: (docId: string, patch: Partial<Document>) => void;
   onDeleteDocument: (docId: string) => void;
 }
+
+const CATEGORIES: Document["category"][] = ["Blueprints", "Permits", "Field Reports", "Contracts"];
+
+const categoryLabel: Record<string, string> = {
+  Blueprints: "Blueprints / CAD",
+  Permits: "Building Permits",
+  "Field Reports": "Field Logs",
+  Contracts: "Signed Agreements",
+};
+
+const categoryColor: Record<string, string> = {
+  Blueprints:    "bg-cyan-500/10 text-cyan-400",
+  Permits:       "bg-amber-500/10 text-amber-400",
+  "Field Reports": "bg-teal-500/10 text-teal-400",
+  Contracts:     "bg-indigo-500/10 text-indigo-400",
+};
 
 export const DocumentView: React.FC<DocumentProps> = ({
   documents,
   onAddDocument,
-  onDeleteDocument
+  onUpdateDocument,
+  onDeleteDocument,
 }) => {
   const [selectedFolder, setSelectedFolder] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Upload modal
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploading, setUploading] = useState(false);
-
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState<Document["category"]>("Blueprints");
   const [newSize, setNewSize] = useState("");
@@ -37,12 +57,21 @@ export const DocumentView: React.FC<DocumentProps> = ({
   const [droppedFile, setDroppedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Edit modal
+  const [editDoc, setEditDoc] = useState<Document | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editCategory, setEditCategory] = useState<Document["category"]>("Blueprints");
+  const [editUploadedBy, setEditUploadedBy] = useState("");
+  const [editRevisionDate, setEditRevisionDate] = useState("");
+  const [editFileType, setEditFileType] = useState("");
+  const [saving, setSaving] = useState(false);
+
   const folders = [
-    { id: "All",          name: "All Vault",          count: documents.length },
-    { id: "Blueprints",   name: "Blueprints / CAD",   count: documents.filter(d => d.category === "Blueprints").length },
-    { id: "Permits",      name: "Building Permits",   count: documents.filter(d => d.category === "Permits").length },
-    { id: "Field Reports",name: "Field Logs",          count: documents.filter(d => d.category === "Field Reports").length },
-    { id: "Contracts",    name: "Signed Agreements",  count: documents.filter(d => d.category === "Contracts").length },
+    { id: "All",           name: "All Vault",         count: documents.length },
+    { id: "Blueprints",    name: "Blueprints / CAD",  count: documents.filter(d => d.category === "Blueprints").length },
+    { id: "Permits",       name: "Building Permits",  count: documents.filter(d => d.category === "Permits").length },
+    { id: "Field Reports", name: "Field Logs",        count: documents.filter(d => d.category === "Field Reports").length },
+    { id: "Contracts",     name: "Signed Agreements", count: documents.filter(d => d.category === "Contracts").length },
   ];
 
   const filteredDocs = documents.filter(doc => {
@@ -50,6 +79,8 @@ export const DocumentView: React.FC<DocumentProps> = ({
     const matchSearch = doc.name.toLowerCase().includes(searchQuery.toLowerCase());
     return matchFolder && matchSearch;
   });
+
+  // ── Upload helpers ────────────────────────────────────────────────────────
 
   const applyFile = (file: File) => {
     setDroppedFile(file);
@@ -75,7 +106,7 @@ export const DocumentView: React.FC<DocumentProps> = ({
     if (file) applyFile(file);
   };
 
-  const closeModal = () => {
+  const closeUploadModal = () => {
     setShowUploadModal(false);
     setNewTitle("");
     setNewSize("");
@@ -110,13 +141,46 @@ export const DocumentView: React.FC<DocumentProps> = ({
         created = await api.documents.create(created);
       }
       onAddDocument(created);
-      closeModal();
+      closeUploadModal();
     } catch {
       alert("Upload failed. Please try again.");
     } finally {
       setUploading(false);
     }
   };
+
+  // ── Edit helpers ──────────────────────────────────────────────────────────
+
+  const openEdit = (doc: Document) => {
+    setEditDoc(doc);
+    setEditName(doc.name);
+    setEditCategory(doc.category);
+    setEditUploadedBy(doc.uploadedBy);
+    setEditRevisionDate(doc.uploadedAt);
+    setEditFileType(doc.fileType);
+  };
+
+  const closeEdit = () => {
+    setEditDoc(null);
+    setSaving(false);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editDoc) return;
+    setSaving(true);
+    const patch: Partial<Document> = {
+      name: editName.trim() || editDoc.name,
+      category: editCategory,
+      uploadedBy: editUploadedBy.trim() || editDoc.uploadedBy,
+      uploadedAt: editRevisionDate.trim() || editDoc.uploadedAt,
+      fileType: editFileType.trim() || editDoc.fileType,
+    };
+    onUpdateDocument(editDoc.id, patch);
+    closeEdit();
+  };
+
+  // ── View / Download ───────────────────────────────────────────────────────
 
   const handleView = (doc: Document) => {
     if (doc.fileUrl) {
@@ -224,12 +288,7 @@ export const DocumentView: React.FC<DocumentProps> = ({
                   </div>
                 </td>
                 <td className="p-3">
-                  <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-mono ${
-                    doc.category === "Blueprints"    ? "bg-cyan-500/10 text-cyan-400" :
-                    doc.category === "Permits"       ? "bg-amber-500/10 text-amber-400" :
-                    doc.category === "Field Reports" ? "bg-teal-500/10 text-teal-400" :
-                                                       "bg-indigo-500/10 text-indigo-400"
-                  }`}>
+                  <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-mono ${categoryColor[doc.category] ?? "bg-slate-500/10 text-slate-400"}`}>
                     {doc.category}
                   </span>
                 </td>
@@ -258,6 +317,14 @@ export const DocumentView: React.FC<DocumentProps> = ({
                     </button>
                     <button
                       type="button"
+                      title="Edit document metadata"
+                      onClick={() => openEdit(doc)}
+                      className="p-1.5 rounded hover:bg-slate-800 transition"
+                    >
+                      <Pencil className="w-4 h-4 text-slate-400 hover:text-amber-400" />
+                    </button>
+                    <button
+                      type="button"
                       title="Delete document"
                       onClick={() => onDeleteDocument(doc.id)}
                       className="p-1.5 rounded hover:bg-slate-800 transition"
@@ -279,14 +346,13 @@ export const DocumentView: React.FC<DocumentProps> = ({
         </table>
       </div>
 
-      {/* Upload modal */}
+      {/* ── Upload modal ───────────────────────────────────────────────────── */}
       {showUploadModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 text-xs">
-
             <div className="flex justify-between items-center pb-2 border-b border-slate-800">
               <h3 className="text-base font-bold text-white font-display">Upload Blueprint Sheet or Permit</h3>
-              <button type="button" title="Close" onClick={closeModal} className="p-1 text-slate-400 hover:text-white rounded">
+              <button type="button" title="Close" onClick={closeUploadModal} className="p-1 text-slate-400 hover:text-white rounded">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -313,10 +379,7 @@ export const DocumentView: React.FC<DocumentProps> = ({
                     onChange={e => setNewCategory(e.target.value as Document["category"])}
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white focus:outline-none focus:border-cyan-500"
                   >
-                    <option value="Blueprints">Blueprints / CAD</option>
-                    <option value="Permits">Building Permits</option>
-                    <option value="Field Reports">Field Logs</option>
-                    <option value="Contracts">Signed Agreements</option>
+                    {CATEGORIES.map(c => <option key={c} value={c}>{categoryLabel[c]}</option>)}
                   </select>
                 </div>
                 <div>
@@ -339,9 +402,9 @@ export const DocumentView: React.FC<DocumentProps> = ({
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
                 className={`border border-dashed rounded-xl p-6 text-center transition cursor-pointer select-none ${
-                  dragOver      ? "border-cyan-500 bg-cyan-500/5" :
-                  droppedFile   ? "border-emerald-500/50 bg-emerald-500/5" :
-                                  "border-slate-700 hover:border-cyan-500/40 bg-slate-950"
+                  dragOver    ? "border-cyan-500 bg-cyan-500/5" :
+                  droppedFile ? "border-emerald-500/50 bg-emerald-500/5" :
+                                "border-slate-700 hover:border-cyan-500/40 bg-slate-950"
                 }`}
               >
                 <input
@@ -370,7 +433,7 @@ export const DocumentView: React.FC<DocumentProps> = ({
               </div>
 
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
-                <button type="button" onClick={closeModal} className="px-4 py-2 border border-slate-800 text-slate-400 hover:bg-slate-800 rounded transition">
+                <button type="button" onClick={closeUploadModal} className="px-4 py-2 border border-slate-800 text-slate-400 hover:bg-slate-800 rounded transition">
                   Cancel
                 </button>
                 <button
@@ -380,6 +443,107 @@ export const DocumentView: React.FC<DocumentProps> = ({
                 >
                   {uploading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   {uploading ? "Uploading…" : "Upload & Register"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit metadata modal ────────────────────────────────────────────── */}
+      {editDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 text-xs">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+              <div>
+                <h3 className="text-base font-bold text-white font-display">Edit Document Metadata</h3>
+                <p className="text-[10px] text-slate-500 font-mono mt-0.5 truncate max-w-xs">{editDoc.name}</p>
+              </div>
+              <button type="button" title="Close" onClick={closeEdit} className="p-1 text-slate-400 hover:text-white rounded">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              <div>
+                <label className="block text-slate-400 font-mono mb-1">File Title</label>
+                <input
+                  type="text"
+                  title="File title"
+                  placeholder="Document file title"
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-400 font-mono mb-1">Vault Folder</label>
+                  <select
+                    title="Vault folder"
+                    value={editCategory}
+                    onChange={e => setEditCategory(e.target.value as Document["category"])}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white focus:outline-none focus:border-cyan-500"
+                  >
+                    {CATEGORIES.map(c => <option key={c} value={c}>{categoryLabel[c]}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-mono mb-1">File Type</label>
+                  <input
+                    type="text"
+                    value={editFileType}
+                    onChange={e => setEditFileType(e.target.value)}
+                    placeholder="e.g. Architectural Plan"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-400 font-mono mb-1">Uploaded By</label>
+                  <input
+                    type="text"
+                    title="Uploaded by"
+                    placeholder="e.g. John Smith"
+                    value={editUploadedBy}
+                    onChange={e => setEditUploadedBy(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-mono mb-1">Revision Date</label>
+                  <input
+                    type="text"
+                    value={editRevisionDate}
+                    onChange={e => setEditRevisionDate(e.target.value)}
+                    placeholder="e.g. Jun 12, 2026"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+
+              {editDoc.fileUrl && (
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-950 border border-slate-800">
+                  <FileText className="w-4 h-4 text-cyan-500 flex-shrink-0" />
+                  <span className="text-slate-400 truncate">{editDoc.fileUrl}</span>
+                  <span className="text-[9px] text-emerald-400 font-mono ml-auto">file attached</span>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                <button type="button" onClick={closeEdit} className="px-4 py-2 border border-slate-800 text-slate-400 hover:bg-slate-800 rounded transition">
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 font-bold font-mono text-slate-950 rounded cursor-pointer transition disabled:opacity-50 flex items-center gap-2"
+                >
+                  {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {saving ? "Saving…" : "Save Changes"}
                 </button>
               </div>
             </form>

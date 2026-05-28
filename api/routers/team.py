@@ -10,7 +10,7 @@ from api.deps import get_db, get_current_user
 router = APIRouter()
 
 
-@router.get("/")
+@router.get("")
 async def list_team(db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
     result = await db.execute(
         select(TeamMember).where(TeamMember.tenant_id == user["tenant_id"]).order_by(TeamMember.created_at.desc())
@@ -18,7 +18,7 @@ async def list_team(db: AsyncSession = Depends(get_db), user=Depends(get_current
     return [TeamMemberOut.from_orm_row(r) for r in result.scalars().all()]
 
 
-@router.post("/")
+@router.post("")
 async def create_member(data: TeamMemberCreate, db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
     member = TeamMember(
         id=str(uuid.uuid4()),

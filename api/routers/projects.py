@@ -10,7 +10,7 @@ from api.deps import get_db, get_current_user
 router = APIRouter()
 
 
-@router.get("/")
+@router.get("")
 async def list_projects(db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
     result = await db.execute(
         select(Project).where(Project.tenant_id == user["tenant_id"]).order_by(Project.created_at.desc())
@@ -18,7 +18,7 @@ async def list_projects(db: AsyncSession = Depends(get_db), user=Depends(get_cur
     return [ProjectOut.from_orm_row(r) for r in result.scalars().all()]
 
 
-@router.post("/")
+@router.post("")
 async def create_project(data: ProjectCreate, db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
     project = Project(
         id=str(uuid.uuid4()),
